@@ -37,9 +37,9 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const [color, setColor] = useState<NoteColor>('blue')
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
-  const [dataLoaded, setDataLoaded] = useState(false)
   const isInitialLoad = useRef(true)
   const isMounted = useRef(true)
+  const dataLoadedRef = useRef(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -52,8 +52,10 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   // Track component mounted state and cleanup
   useEffect(() => {
     isMounted.current = true
+    dataLoadedRef.current = false
     return () => {
       isMounted.current = false
+      dataLoadedRef.current = false
     }
   }, [])
 
@@ -83,7 +85,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
 
         // Mark data as loaded - wait a bit to ensure state updates complete
         setTimeout(() => {
-          setDataLoaded(true)
+          dataLoadedRef.current = true
           isInitialLoad.current = false
         }, 500)
       } catch (error) {
@@ -100,14 +102,14 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   // Auto-save effect - only runs after data is confirmed loaded
   useEffect(() => {
     // Don't save until we've confirmed data is loaded from database
-    if (!note || loading || !dataLoaded) return
+    if (!note || loading || !dataLoadedRef.current) return
 
     // Additional safety: don't save if component is unmounted
     if (!isMounted.current) return
 
     const saveNote = async () => {
       // Double-check component is still mounted before starting
-      if (!isMounted.current) return
+      if (!isMounted.current || !dataLoadedRef.current) return
 
       setSaveStatus('saving')
       try {
@@ -125,8 +127,18 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
           }
         }
 
-        // Triple-check before making the database request
-        if (!isMounted.current) return
+        // CRITICAL: Validate data right before database write
+        // If component unmounted or data invalid during the async operation, abort
+        if (!isMounted.current || !dataLoadedRef.current) {
+          console.log('Save aborted: component unmounted or data not loaded')
+          return
+        }
+
+        // Additional validation: don't save if title is empty (likely a race condition)
+        if (!debouncedTitle || debouncedTitle.trim() === '') {
+          console.log('Save aborted: empty title detected')
+          return
+        }
 
         const { error } = await supabase
           .from('notes')
@@ -152,7 +164,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
     }
 
     saveNote()
-  }, [debouncedTitle, debouncedMarkdownContent, debouncedTodoItems, debouncedColor, note, loading, dataLoaded, resolvedParams.id, supabase, isMounted])
+  }, [debouncedTitle, debouncedMarkdownContent, debouncedTodoItems, debouncedColor, note, loading, resolvedParams.id, supabase])
 
   if (loading) {
     return (
