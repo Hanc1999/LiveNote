@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { MarkdownEditor } from '@/components/editor/markdown-editor'
@@ -37,6 +37,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const [color, setColor] = useState<NoteColor>('blue')
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
+  const isInitialLoad = useRef(true)
   const router = useRouter()
   const supabase = createClient()
 
@@ -69,6 +70,11 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
           const content = data.content as TodoContent
           setTodoItems(content.items || [])
         }
+
+        // Mark initial load as complete after data is loaded
+        setTimeout(() => {
+          isInitialLoad.current = false
+        }, 100)
       } catch (error) {
         console.error('Failed to fetch note:', error)
         router.push('/dashboard')
@@ -82,7 +88,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
 
   // Auto-save effect
   useEffect(() => {
-    if (!note || loading) return
+    if (!note || loading || isInitialLoad.current) return
 
     const saveNote = async () => {
       setSaveStatus('saving')
