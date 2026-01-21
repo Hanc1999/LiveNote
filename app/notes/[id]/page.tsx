@@ -38,6 +38,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
   const isInitialLoad = useRef(true)
+  const isMounted = useRef(true)
   const router = useRouter()
   const supabase = createClient()
 
@@ -46,6 +47,14 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const debouncedMarkdownContent = useDebounce(markdownContent, 1000)
   const debouncedTodoItems = useDebounce(JSON.stringify(todoItems), 1000)
   const debouncedColor = useDebounce(color, 500)
+
+  // Track component mounted state
+  useEffect(() => {
+    isMounted.current = true
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
 
   // Fetch note on mount
   useEffect(() => {
@@ -90,7 +99,13 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     if (!note || loading || isInitialLoad.current) return
 
+    // Validate data before saving
+    if (!debouncedTitle.trim()) return // Don't save if title is empty
+
     const saveNote = async () => {
+      // Check if component is still mounted
+      if (!isMounted.current) return
+
       setSaveStatus('saving')
       try {
         let updatedContent: MarkdownContent | TodoContent
@@ -107,6 +122,9 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
           }
         }
 
+        // Check again before making the request
+        if (!isMounted.current) return
+
         const { error } = await supabase
           .from('notes')
           .update({
@@ -118,10 +136,15 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
 
         if (error) throw error
 
-        setSaveStatus('saved')
+        // Only update status if still mounted
+        if (isMounted.current) {
+          setSaveStatus('saved')
+        }
       } catch (error) {
         console.error('Failed to save note:', error)
-        setSaveStatus('error')
+        if (isMounted.current) {
+          setSaveStatus('error')
+        }
       }
     }
 
