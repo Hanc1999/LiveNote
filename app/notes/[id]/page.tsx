@@ -107,14 +107,20 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
 
   // Auto-save effect
   useEffect(() => {
-    // Multiple safety checks
-    if (!note || loading || isInitialLoad.current || !hasLoadedData.current) return
+    // Basic checks
+    if (!note || loading || isInitialLoad.current) return
 
-    // Critical: Don't save if title is empty OR if it's different from what we loaded
-    if (!debouncedTitle.trim()) return
+    // HARD RULE: NEVER save empty/default values to an existing note
+    // This prevents data loss when navigating away quickly
+    const isEmptyTitle = !debouncedTitle || debouncedTitle.trim() === ''
+    const isEmptyMarkdown = note.note_type === 'markdown' && debouncedMarkdownContent === ''
+    const isEmptyTodo = note.note_type === 'todo' && JSON.parse(debouncedTodoItems).length === 0
 
-    // If title is empty but we had a valid original title, something went wrong - abort
-    if (originalTitle.current && !debouncedTitle) return
+    // If trying to save empty data, abort immediately
+    if (isEmptyTitle || isEmptyMarkdown || isEmptyTodo) {
+      console.log('Blocked save: attempting to save empty values to existing note')
+      return
+    }
 
     const saveNote = async () => {
       // Check if component is still mounted
@@ -136,7 +142,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
           }
         }
 
-        // Check again before making the request
+        // Final check before saving
         if (!isMounted.current) return
 
         const { error } = await supabase
