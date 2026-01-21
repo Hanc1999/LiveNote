@@ -39,6 +39,8 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
   const isInitialLoad = useRef(true)
   const isMounted = useRef(true)
+  const hasLoadedData = useRef(false)
+  const originalTitle = useRef<string>('')
   const router = useRouter()
   const supabase = createClient()
 
@@ -48,11 +50,15 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const debouncedTodoItems = useDebounce(JSON.stringify(todoItems), 1000)
   const debouncedColor = useDebounce(color, 500)
 
-  // Track component mounted state
+  // Track component mounted state and cleanup
   useEffect(() => {
     isMounted.current = true
     return () => {
       isMounted.current = false
+      // Reset flags on unmount
+      isInitialLoad.current = true
+      hasLoadedData.current = false
+      originalTitle.current = ''
     }
   }, [])
 
@@ -72,6 +78,9 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
         setTitle(data.title)
         setColor(data.color as NoteColor)
 
+        // Store original data for validation
+        originalTitle.current = data.title
+
         if (data.note_type === 'markdown') {
           const content = data.content as MarkdownContent
           setMarkdownContent(content.markdown || '')
@@ -80,10 +89,11 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
           setTodoItems(content.items || [])
         }
 
-        // Mark initial load as complete after data is loaded
+        // Mark data as loaded and initial load as complete after a longer delay
+        hasLoadedData.current = true
         setTimeout(() => {
           isInitialLoad.current = false
-        }, 100)
+        }, 1500) // Increased delay to 1.5 seconds
       } catch (error) {
         console.error('Failed to fetch note:', error)
         router.push('/dashboard')
@@ -97,10 +107,14 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
 
   // Auto-save effect
   useEffect(() => {
-    if (!note || loading || isInitialLoad.current) return
+    // Multiple safety checks
+    if (!note || loading || isInitialLoad.current || !hasLoadedData.current) return
 
-    // Validate data before saving
-    if (!debouncedTitle.trim()) return // Don't save if title is empty
+    // Critical: Don't save if title is empty OR if it's different from what we loaded
+    if (!debouncedTitle.trim()) return
+
+    // If title is empty but we had a valid original title, something went wrong - abort
+    if (originalTitle.current && !debouncedTitle) return
 
     const saveNote = async () => {
       // Check if component is still mounted
