@@ -37,10 +37,9 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const [color, setColor] = useState<NoteColor>('blue')
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
+  const [dataLoaded, setDataLoaded] = useState(false)
   const isInitialLoad = useRef(true)
   const isMounted = useRef(true)
-  const hasLoadedData = useRef(false)
-  const originalTitle = useRef<string>('')
   const router = useRouter()
   const supabase = createClient()
 
@@ -55,10 +54,6 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
     isMounted.current = true
     return () => {
       isMounted.current = false
-      // Reset flags on unmount
-      isInitialLoad.current = true
-      hasLoadedData.current = false
-      originalTitle.current = ''
     }
   }, [])
 
@@ -78,9 +73,6 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
         setTitle(data.title)
         setColor(data.color as NoteColor)
 
-        // Store original data for validation
-        originalTitle.current = data.title
-
         if (data.note_type === 'markdown') {
           const content = data.content as MarkdownContent
           setMarkdownContent(content.markdown || '')
@@ -89,11 +81,11 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
           setTodoItems(content.items || [])
         }
 
-        // Mark data as loaded and initial load as complete after a longer delay
-        hasLoadedData.current = true
+        // Mark data as loaded - wait a bit to ensure state updates complete
         setTimeout(() => {
+          setDataLoaded(true)
           isInitialLoad.current = false
-        }, 1500) // Increased delay to 1.5 seconds
+        }, 500)
       } catch (error) {
         console.error('Failed to fetch note:', error)
         router.push('/dashboard')
@@ -105,25 +97,16 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
     fetchNote()
   }, [resolvedParams.id, router, supabase])
 
-  // Auto-save effect
+  // Auto-save effect - only runs after data is confirmed loaded
   useEffect(() => {
-    // Basic checks
-    if (!note || loading || isInitialLoad.current) return
+    // Don't save until we've confirmed data is loaded from database
+    if (!note || loading || !dataLoaded) return
 
-    // HARD RULE: NEVER save empty/default values to an existing note
-    // This prevents data loss when navigating away quickly
-    const isEmptyTitle = !debouncedTitle || debouncedTitle.trim() === ''
-    const isEmptyMarkdown = note.note_type === 'markdown' && debouncedMarkdownContent === ''
-    const isEmptyTodo = note.note_type === 'todo' && JSON.parse(debouncedTodoItems).length === 0
-
-    // If trying to save empty data, abort immediately
-    if (isEmptyTitle || isEmptyMarkdown || isEmptyTodo) {
-      console.log('Blocked save: attempting to save empty values to existing note')
-      return
-    }
+    // Additional safety: don't save if component is unmounted
+    if (!isMounted.current) return
 
     const saveNote = async () => {
-      // Check if component is still mounted
+      // Double-check component is still mounted before starting
       if (!isMounted.current) return
 
       setSaveStatus('saving')
@@ -142,7 +125,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
           }
         }
 
-        // Final check before saving
+        // Triple-check before making the database request
         if (!isMounted.current) return
 
         const { error } = await supabase
@@ -169,7 +152,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
     }
 
     saveNote()
-  }, [debouncedTitle, debouncedMarkdownContent, debouncedTodoItems, debouncedColor, note, loading, resolvedParams.id, supabase])
+  }, [debouncedTitle, debouncedMarkdownContent, debouncedTodoItems, debouncedColor, note, loading, dataLoaded, resolvedParams.id, supabase, isMounted])
 
   if (loading) {
     return (
