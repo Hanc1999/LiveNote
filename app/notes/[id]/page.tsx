@@ -37,6 +37,7 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
   const [color, setColor] = useState<NoteColor>('blue')
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved')
+  const [isScrolled, setIsScrolled] = useState(false)
   const isInitialLoad = useRef(true)
   const isMounted = useRef(true)
   const dataLoadedRef = useRef(false)
@@ -57,6 +58,16 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
       isMounted.current = false
       dataLoadedRef.current = false
     }
+  }, [])
+
+  // Track scroll position to hide/show color picker
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   // Fetch note on mount
@@ -210,10 +221,12 @@ export default function NotePage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-4">
-            <span className="text-sm text-gray-600">Color:</span>
-            <ColorPicker value={color} onChange={setColor} />
-          </div>
+          {!isScrolled && (
+            <div className="mt-4 flex items-center gap-4 transition-opacity duration-200">
+              <span className="text-sm text-gray-600">Color:</span>
+              <ColorPicker value={color} onChange={setColor} />
+            </div>
+          )}
         </div>
       </header>
 

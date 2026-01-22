@@ -49,7 +49,7 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
   return (
     <div className="border rounded-lg overflow-hidden">
       {/* Toolbar */}
-      <div className="bg-gray-50 border-b p-2 flex flex-wrap gap-1">
+      <div className="bg-gray-50 border-b p-2 flex flex-wrap gap-1 sticky top-16 z-10">
         <Button
           variant="ghost"
           size="icon"
