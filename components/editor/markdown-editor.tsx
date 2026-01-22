@@ -11,7 +11,6 @@ import {
   Heading2,
   List,
   ListOrdered,
-  Code,
   Undo,
   Redo,
 } from 'lucide-react'
@@ -103,15 +102,6 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
           type="button"
         >
           <ListOrdered className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={editor.isActive('codeBlock') ? 'bg-gray-200' : ''}
-          type="button"
-        >
-          <Code className="h-4 w-4" />
         </Button>
 
         <div className="flex-1" />
