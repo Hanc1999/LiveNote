@@ -47,9 +47,9 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg">
       {/* Toolbar */}
-      <div className="bg-gray-50 border-b p-2 flex flex-wrap gap-1 sticky top-16 z-10">
+      <div className="bg-white border-b p-2 flex flex-wrap gap-1 sticky top-20 z-20 shadow-sm">
         <Button
           variant="ghost"
           size="icon"
@@ -137,7 +137,9 @@ export function MarkdownEditor({ content, onChange, placeholder = 'Start writing
       </div>
 
       {/* Editor Content */}
-      <EditorContent editor={editor} />
+      <div className="overflow-auto">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }
